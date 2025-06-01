@@ -3,50 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DevOps-as-a-Service MVP</title>
+    <title>DevOps-as-a-Service</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <header class="text-center mb-12">
-            <h1 class="text-4xl font-bold text-gray-800 mb-4">DevOps-as-a-Service</h1>
-            <p class="text-xl text-gray-600">Configuration automatique de CI/CD pour votre projet</p>
-        </header>
-
+        <h1 class="text-3xl font-bold text-center mb-8">DevOps-as-a-Service</h1>
+        
         <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-            <form id="repoForm" class="space-y-6">
+            <form id="repoForm" class="space-y-4">
                 <div>
-                    <label for="repoUrl" class="block text-sm font-medium text-gray-700">URL du Repository Git</label>
+                    <label for="repoUrl" class="block text-sm font-medium text-gray-700">URL du Repository GitHub</label>
                     <input type="text" id="repoUrl" name="repoUrl" required
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                            placeholder="https://github.com/username/repo.git">
                 </div>
                 <button type="submit"
                         class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Analyser le Repository
+                    Analyser
                 </button>
             </form>
+        </div>
 
-            <div id="results" class="mt-8 hidden">
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Résultats de l'analyse</h2>
-                <div class="space-y-4">
-                    <div class="bg-gray-50 p-4 rounded-md">
-                        <h3 class="font-medium text-gray-700">Langage détecté</h3>
-                        <p id="language" class="text-gray-600"></p>
+        <div id="results" class="mt-8 space-y-6 hidden">
+            <!-- Informations de base -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Informations du Repository</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">Langage</p>
+                        <p id="language" class="font-medium"></p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-md">
-                        <h3 class="font-medium text-gray-700">Framework détecté</h3>
-                        <p id="framework" class="text-gray-600"></p>
-                    </div>
-                    <div class="bg-gray-50 p-4 rounded-md">
-                        <h3 class="font-medium text-gray-700">Dépendances</h3>
-                        <ul id="dependencies" class="text-gray-600 list-disc list-inside"></ul>
-                    </div>
-                    <div class="bg-gray-50 p-4 rounded-md">
-                        <h3 class="font-medium text-gray-700">Configuration CI/CD suggérée</h3>
-                        <pre id="pipeline" class="bg-gray-800 text-white p-4 rounded-md overflow-x-auto"></pre>
+                    <div>
+                        <p class="text-sm text-gray-600">Framework</p>
+                        <p id="framework" class="font-medium"></p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Health Score -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Health Score</h2>
+                <div class="flex items-center justify-center mb-6">
+                    <div class="relative w-48 h-48">
+                        <canvas id="healthScoreChart"></canvas>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <span id="healthScorePercentage" class="text-3xl font-bold"></span>
+                                <span class="text-sm text-gray-600">/ 100</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Détails du Health Score -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-4">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-medium mb-2">Tests</h3>
+                            <div class="flex items-center">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                    <div id="testsScore" class="bg-green-500 h-2 rounded-full"></div>
+                                </div>
+                                <span id="testsScoreText" class="ml-2 text-sm"></span>
+                            </div>
+                            <ul id="testsDetails" class="mt-2 text-sm text-gray-600"></ul>
+                        </div>
+
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-medium mb-2">Documentation</h3>
+                            <div class="flex items-center">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                    <div id="docScore" class="bg-blue-500 h-2 rounded-full"></div>
+                                </div>
+                                <span id="docScoreText" class="ml-2 text-sm"></span>
+                            </div>
+                            <ul id="docDetails" class="mt-2 text-sm text-gray-600"></ul>
+                        </div>
+
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-medium mb-2">Structure</h3>
+                            <div class="flex items-center">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                    <div id="structureScore" class="bg-purple-500 h-2 rounded-full"></div>
+                                </div>
+                                <span id="structureScoreText" class="ml-2 text-sm"></span>
+                            </div>
+                            <ul id="structureDetails" class="mt-2 text-sm text-gray-600"></ul>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-medium mb-2">Bonnes Pratiques</h3>
+                            <div class="flex items-center">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                    <div id="practicesScore" class="bg-yellow-500 h-2 rounded-full"></div>
+                                </div>
+                                <span id="practicesScoreText" class="ml-2 text-sm"></span>
+                            </div>
+                            <ul id="practicesDetails" class="mt-2 text-sm text-gray-600"></ul>
+                        </div>
+
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-medium mb-2">Sécurité</h3>
+                            <div class="flex items-center">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                    <div id="securityScore" class="bg-red-500 h-2 rounded-full"></div>
+                                </div>
+                                <span id="securityScoreText" class="ml-2 text-sm"></span>
+                            </div>
+                            <ul id="securityDetails" class="mt-2 text-sm text-gray-600"></ul>
+                        </div>
+
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-medium mb-2">Dépendances</h3>
+                            <div class="flex items-center">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                    <div id="depsScore" class="bg-indigo-500 h-2 rounded-full"></div>
+                                </div>
+                                <span id="depsScoreText" class="ml-2 text-sm"></span>
+                            </div>
+                            <ul id="depsDetails" class="mt-2 text-sm text-gray-600"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dépendances -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Dépendances</h2>
+                <div id="dependencies" class="space-y-2"></div>
+            </div>
+
+            <!-- Pipeline suggéré -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Pipeline CI/CD suggéré</h2>
+                <pre id="pipeline" class="bg-gray-50 p-4 rounded-lg overflow-x-auto"></pre>
             </div>
         </div>
     </div>
@@ -69,24 +163,100 @@
                 
                 if (data.status === 'success') {
                     document.getElementById('results').classList.remove('hidden');
+                    
+                    // Afficher les informations de base
                     document.getElementById('language').textContent = data.analysis.language;
                     document.getElementById('framework').textContent = data.analysis.framework;
                     
+                    // Afficher le Health Score
+                    const healthScore = data.analysis.health_score;
+                    document.getElementById('healthScorePercentage').textContent = Math.round(healthScore.percentage);
+                    
+                    // Mettre à jour les scores et détails
+                    updateScoreSection('tests', healthScore.details.tests);
+                    updateScoreSection('doc', healthScore.details.documentation);
+                    updateScoreSection('structure', healthScore.details.structure);
+                    updateScoreSection('practices', healthScore.details.best_practices);
+                    updateScoreSection('security', healthScore.details.security);
+                    updateScoreSection('deps', healthScore.details.dependencies);
+                    
+                    // Créer le graphique du Health Score
+                    createHealthScoreChart(healthScore);
+                    
+                    // Afficher les dépendances
                     const dependenciesList = document.getElementById('dependencies');
                     dependenciesList.innerHTML = data.analysis.dependencies
-                        .map(dep => `<li>${dep}</li>`)
+                        .map(dep => `<div class="p-2 bg-gray-50 rounded">${dep}</div>`)
                         .join('');
                     
+                    // Afficher le pipeline
                     document.getElementById('pipeline').textContent = 
                         JSON.stringify(data.analysis.suggested_pipeline, null, 2);
                 } else {
                     alert('Erreur: ' + data.message);
                 }
             } catch (error) {
-                alert('Erreur lors de l\'analyse du repository');
-                console.error(error);
+                alert('Erreur lors de l\'analyse: ' + error);
             }
         });
+
+        function updateScoreSection(section, data) {
+            const scoreElement = document.getElementById(`${section}Score`);
+            const scoreTextElement = document.getElementById(`${section}ScoreText`);
+            const detailsElement = document.getElementById(`${section}Details`);
+            
+            const percentage = (data.score / data.max) * 100;
+            scoreElement.style.width = `${percentage}%`;
+            scoreTextElement.textContent = `${data.score}/${data.max}`;
+            
+            detailsElement.innerHTML = data.details
+                .map(detail => `<li>${detail}</li>`)
+                .join('');
+        }
+
+        function createHealthScoreChart(healthScore) {
+            const ctx = document.getElementById('healthScoreChart').getContext('2d');
+            
+            // Vérifier si un graphique existe déjà et le détruire correctement
+            if (window.healthScoreChart instanceof Chart) {
+                window.healthScoreChart.destroy();
+            }
+            
+            window.healthScoreChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Tests', 'Documentation', 'Structure', 'Bonnes Pratiques', 'Sécurité', 'Dépendances'],
+                    datasets: [{
+                        data: [
+                            healthScore.details.tests.score,
+                            healthScore.details.documentation.score,
+                            healthScore.details.structure.score,
+                            healthScore.details.best_practices.score,
+                            healthScore.details.security.score,
+                            healthScore.details.dependencies.score
+                        ],
+                        backgroundColor: [
+                            '#10B981', // green
+                            '#3B82F6', // blue
+                            '#8B5CF6', // purple
+                            '#F59E0B', // yellow
+                            '#EF4444', // red
+                            '#6366F1'  // indigo
+                        ]
+                    }]
+                },
+                options: {
+                    cutout: '70%',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html> 

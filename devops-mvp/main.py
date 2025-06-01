@@ -138,7 +138,8 @@ async def analyze_repository(repo_url: str = Form(...)):
             "language": detect_language(local_path),
             "framework": detect_framework(local_path),
             "dependencies": detect_dependencies(local_path),
-            "suggested_pipeline": generate_pipeline_config(local_path)
+            "suggested_pipeline": generate_pipeline_config(local_path),
+            "health_score": calculate_health_score(local_path)
         }
         
         print(f"Analyse terminée: {analysis}")
@@ -409,6 +410,295 @@ def generate_pipeline_config(path):
         ])
     
     return config
+
+def calculate_health_score(path):
+    print(f"\nCalcul du Health Score pour {path}")
+    score = 0
+    max_score = 100
+    details = {}
+    
+    # 1. Vérification des tests (20 points)
+    test_score = check_tests(path)
+    score += test_score
+    details['tests'] = {
+        'score': test_score,
+        'max': 20,
+        'details': check_test_details(path)
+    }
+    
+    # 2. Vérification de la documentation (15 points)
+    doc_score = check_documentation(path)
+    score += doc_score
+    details['documentation'] = {
+        'score': doc_score,
+        'max': 15,
+        'details': check_doc_details(path)
+    }
+    
+    # 3. Vérification de la structure du projet (15 points)
+    structure_score = check_project_structure(path)
+    score += structure_score
+    details['structure'] = {
+        'score': structure_score,
+        'max': 15,
+        'details': check_structure_details(path)
+    }
+    
+    # 4. Vérification des bonnes pratiques (20 points)
+    practices_score = check_best_practices(path)
+    score += practices_score
+    details['best_practices'] = {
+        'score': practices_score,
+        'max': 20,
+        'details': check_practices_details(path)
+    }
+    
+    # 5. Vérification de la sécurité (15 points)
+    security_score = check_security(path)
+    score += security_score
+    details['security'] = {
+        'score': security_score,
+        'max': 15,
+        'details': check_security_details(path)
+    }
+    
+    # 6. Vérification des dépendances (15 points)
+    deps_score = check_dependencies_health(path)
+    score += deps_score
+    details['dependencies'] = {
+        'score': deps_score,
+        'max': 15,
+        'details': check_deps_details(path)
+    }
+    
+    return {
+        'total_score': score,
+        'max_score': max_score,
+        'percentage': (score / max_score) * 100,
+        'details': details
+    }
+
+def check_tests(path):
+    score = 0
+    # Vérifier la présence de tests
+    if os.path.exists(os.path.join(path, "tests")):
+        score += 10
+    if os.path.exists(os.path.join(path, "test")):
+        score += 10
+    
+    # Vérifier la présence de fichiers de test
+    test_files = []
+    for root, _, files in os.walk(path):
+        if '.git' in root:
+            continue
+        for file in files:
+            if file.startswith('test_') or file.endswith('_test.py'):
+                test_files.append(os.path.join(root, file))
+    
+    if test_files:
+        score += 10
+    
+    return min(score, 20)
+
+def check_test_details(path):
+    details = []
+    test_files = []
+    
+    for root, _, files in os.walk(path):
+        if '.git' in root:
+            continue
+        for file in files:
+            if file.startswith('test_') or file.endswith('_test.py'):
+                test_files.append(os.path.join(root, file))
+    
+    if test_files:
+        details.append(f"Fichiers de test trouvés: {len(test_files)}")
+        for file in test_files:
+            details.append(f"- {file}")
+    else:
+        details.append("Aucun fichier de test trouvé")
+    
+    return details
+
+def check_documentation(path):
+    score = 0
+    # Vérifier la présence de README
+    if os.path.exists(os.path.join(path, "README.md")):
+        score += 5
+    if os.path.exists(os.path.join(path, "docs")):
+        score += 5
+    
+    # Vérifier la documentation dans le code
+    doc_files = []
+    for root, _, files in os.walk(path):
+        if '.git' in root:
+            continue
+        for file in files:
+            if file.endswith('.py'):
+                try:
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if '"""' in content or "'''" in content:
+                            doc_files.append(file)
+                except:
+                    pass
+    
+    if doc_files:
+        score += 5
+    
+    return min(score, 15)
+
+def check_doc_details(path):
+    details = []
+    
+    if os.path.exists(os.path.join(path, "README.md")):
+        details.append("README.md présent")
+    if os.path.exists(os.path.join(path, "docs")):
+        details.append("Dossier docs présent")
+    
+    doc_files = []
+    for root, _, files in os.walk(path):
+        if '.git' in root:
+            continue
+        for file in files:
+            if file.endswith('.py'):
+                try:
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if '"""' in content or "'''" in content:
+                            doc_files.append(file)
+                except:
+                    pass
+    
+    if doc_files:
+        details.append(f"Fichiers avec documentation: {len(doc_files)}")
+    
+    return details
+
+def check_project_structure(path):
+    score = 0
+    # Vérifier la structure du projet
+    if os.path.exists(os.path.join(path, "src")):
+        score += 5
+    if os.path.exists(os.path.join(path, "tests")):
+        score += 5
+    if os.path.exists(os.path.join(path, "docs")):
+        score += 5
+    
+    return min(score, 15)
+
+def check_structure_details(path):
+    details = []
+    
+    if os.path.exists(os.path.join(path, "src")):
+        details.append("Dossier src présent")
+    if os.path.exists(os.path.join(path, "tests")):
+        details.append("Dossier tests présent")
+    if os.path.exists(os.path.join(path, "docs")):
+        details.append("Dossier docs présent")
+    
+    return details
+
+def check_best_practices(path):
+    score = 0
+    # Vérifier les bonnes pratiques
+    if os.path.exists(os.path.join(path, ".gitignore")):
+        score += 5
+    if os.path.exists(os.path.join(path, "requirements.txt")):
+        score += 5
+    if os.path.exists(os.path.join(path, "setup.py")):
+        score += 5
+    if os.path.exists(os.path.join(path, "Dockerfile")):
+        score += 5
+    
+    return min(score, 20)
+
+def check_practices_details(path):
+    details = []
+    
+    if os.path.exists(os.path.join(path, ".gitignore")):
+        details.append(".gitignore présent")
+    if os.path.exists(os.path.join(path, "requirements.txt")):
+        details.append("requirements.txt présent")
+    if os.path.exists(os.path.join(path, "setup.py")):
+        details.append("setup.py présent")
+    if os.path.exists(os.path.join(path, "Dockerfile")):
+        details.append("Dockerfile présent")
+    
+    return details
+
+def check_security(path):
+    score = 0
+    # Vérifier la sécurité
+    if os.path.exists(os.path.join(path, ".env.example")):
+        score += 5
+    if os.path.exists(os.path.join(path, "requirements.txt")):
+        try:
+            with open(os.path.join(path, "requirements.txt")) as f:
+                content = f.read().lower()
+                if "cryptography" in content or "pyjwt" in content:
+                    score += 5
+        except:
+            pass
+    
+    return min(score, 15)
+
+def check_security_details(path):
+    details = []
+    
+    if os.path.exists(os.path.join(path, ".env.example")):
+        details.append(".env.example présent")
+    
+    if os.path.exists(os.path.join(path, "requirements.txt")):
+        try:
+            with open(os.path.join(path, "requirements.txt")) as f:
+                content = f.read().lower()
+                if "cryptography" in content:
+                    details.append("cryptography présent")
+                if "pyjwt" in content:
+                    details.append("pyjwt présent")
+        except:
+            pass
+    
+    return details
+
+def check_dependencies_health(path):
+    score = 0
+    # Vérifier la santé des dépendances
+    if os.path.exists(os.path.join(path, "requirements.txt")):
+        try:
+            with open(os.path.join(path, "requirements.txt")) as f:
+                content = f.read()
+                # Vérifier si les versions sont spécifiées
+                if "==" in content:
+                    score += 5
+                # Vérifier si les dépendances sont à jour
+                if "fastapi" in content.lower():
+                    score += 5
+                if "pytest" in content.lower():
+                    score += 5
+        except:
+            pass
+    
+    return min(score, 15)
+
+def check_deps_details(path):
+    details = []
+    
+    if os.path.exists(os.path.join(path, "requirements.txt")):
+        try:
+            with open(os.path.join(path, "requirements.txt")) as f:
+                content = f.read()
+                if "==" in content:
+                    details.append("Versions spécifiées")
+                if "fastapi" in content.lower():
+                    details.append("FastAPI présent")
+                if "pytest" in content.lower():
+                    details.append("pytest présent")
+        except:
+            pass
+    
+    return details
 
 if __name__ == "__main__":
     import uvicorn

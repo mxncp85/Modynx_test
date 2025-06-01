@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import subprocess
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,6 +12,7 @@ import yaml
 import json
 from pathlib import Path
 from fastapi.templating import Jinja2Templates
+import time
 
 app = FastAPI(title="DevOps-as-a-Service MVP")
 
@@ -964,6 +965,106 @@ def generate_cost_recommendations(costs, path):
         })
     
     return recommendations
+
+@app.get("/docker", response_class=HTMLResponse)
+async def docker_page(request: Request):
+    return templates.TemplateResponse("docker.html", {"request": request})
+
+@app.post("/simulate-docker")
+async def simulate_docker(repo_url: str = Form(...), port: int = Form(...)):
+    async def generate_logs():
+        temp_dir = None
+        try:
+            # Créer un dossier temporaire
+            temp_dir = tempfile.mkdtemp(prefix="docker_sim_")
+            repo_name = repo_url.split("/")[-1].replace(".git", "")
+            local_path = os.path.join(temp_dir, repo_name)
+            
+            yield f"Clonage du repository {repo_url}...\n"
+            repo = git.Repo.clone_from(repo_url, local_path)
+            
+            # Vérifier si un Dockerfile existe
+            dockerfile_path = os.path.join(local_path, "Dockerfile")
+            if not os.path.exists(dockerfile_path):
+                yield "Création d'un Dockerfile par défaut...\n"
+                with open(dockerfile_path, "w") as f:
+                    f.write("""FROM python:3.9-slim
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+""")
+            
+            # Construire l'image Docker
+            yield "Construction de l'image Docker...\n"
+            image_name = f"{repo_name.lower()}:latest"
+            build_process = subprocess.Popen(
+                ["docker", "build", "-t", image_name, "."],
+                cwd=local_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            
+            # Lire la sortie du build en temps réel
+            for line in build_process.stdout:
+                yield f"Build: {line}"
+            
+            build_process.wait()
+            if build_process.returncode != 0:
+                yield "Erreur lors de la construction de l'image Docker\n"
+                return
+            
+            # Lancer le conteneur
+            yield f"Lancement du conteneur sur le port {port}...\n"
+            container_name = f"{repo_name.lower()}-container"
+            run_process = subprocess.Popen(
+                ["docker", "run", "-d", "-p", f"{port}:8000", "--name", container_name, image_name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            
+            # Lire la sortie du run
+            for line in run_process.stdout:
+                yield f"Run: {line}"
+            
+            run_process.wait()
+            if run_process.returncode != 0:
+                yield "Erreur lors du lancement du conteneur\n"
+                return
+            
+            # Afficher les logs du conteneur
+            yield "Récupération des logs du conteneur...\n"
+            log_process = subprocess.Popen(
+                ["docker", "logs", "-f", container_name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            
+            # Lire les logs pendant 30 secondes
+            start_time = time.time()
+            while time.time() - start_time < 30:
+                line = log_process.stdout.readline()
+                if not line:
+                    break
+                yield f"Log: {line}"
+            
+            yield "\nSimulation terminée. Le conteneur continue de tourner en arrière-plan.\n"
+            yield f"L'application est accessible sur http://localhost:{port}\n"
+            
+        except Exception as e:
+            yield f"Erreur: {str(e)}\n"
+        finally:
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                except:
+                    pass
+    
+    return StreamingResponse(generate_logs(), media_type="text/plain")
 
 if __name__ == "__main__":
     import uvicorn

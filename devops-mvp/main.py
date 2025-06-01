@@ -718,7 +718,7 @@ def analyze_cloud_costs(path):
     }
     
     # Générer des recommandations basées sur l'analyse
-    costs["recommendations"] = generate_cost_recommendations(costs)
+    costs["recommendations"] = generate_cost_recommendations(costs, path)
     
     return costs
 
@@ -753,6 +753,15 @@ def analyze_compute_costs(path):
             if os.path.exists(os.path.join(path, config)):
                 costs["details"].append(f"Configuration {provider} détectée")
                 costs["estimated_monthly"] += 100  # Estimation de base
+    
+    # Si aucune configuration n'est détectée, estimer les coûts basés sur le type de projet
+    if not costs["details"]:
+        if os.path.exists(os.path.join(path, "main.py")) or os.path.exists(os.path.join(path, "app.py")):
+            costs["details"].append("Application Python détectée")
+            costs["estimated_monthly"] = 30  # Coût estimé pour une petite application Python
+        elif os.path.exists(os.path.join(path, "package.json")):
+            costs["details"].append("Application Node.js détectée")
+            costs["estimated_monthly"] = 25  # Coût estimé pour une petite application Node.js
     
     return costs
 
@@ -831,11 +840,37 @@ def analyze_database_costs(path):
     
     return costs
 
-def generate_cost_recommendations(costs):
+def generate_cost_recommendations(costs, path):
     recommendations = []
     
+    # Recommandations générales pour les projets locaux
+    if not any(costs[category]["details"] for category in ["compute", "network", "database"]):
+        recommendations.extend([
+            {
+                "category": "compute",
+                "title": "Migration vers le cloud",
+                "description": "Envisagez de migrer votre application vers le cloud pour bénéficier d'une meilleure scalabilité et disponibilité. Commencez par un environnement de développement sur AWS/Azure/GCP.",
+                "potential_savings": "Flexibilité des coûts"
+            },
+            {
+                "category": "storage",
+                "title": "Optimisation du stockage local",
+                "description": "Mettez en place une stratégie de sauvegarde et de versioning pour vos données locales. Considérez l'utilisation de stockage cloud pour les sauvegardes.",
+                "potential_savings": "Sécurité accrue"
+            }
+        ])
+    
+    # Recommandations spécifiques basées sur le type de projet
+    if os.path.exists(os.path.join(path, "main.py")) or os.path.exists(os.path.join(path, "app.py")):
+        recommendations.append({
+            "category": "compute",
+            "title": "Containerisation",
+            "description": "Containerisez votre application Python avec Docker pour faciliter le déploiement et la scalabilité. Cela permettra une transition plus facile vers le cloud.",
+            "potential_savings": "Réduction des coûts de déploiement"
+        })
+    
     # Recommandations pour le calcul
-    if costs["compute"]["estimated_monthly"] > 100:
+    if costs["compute"]["estimated_monthly"] > 0:
         recommendations.append({
             "category": "compute",
             "title": "Optimisation des ressources de calcul",
@@ -844,7 +879,7 @@ def generate_cost_recommendations(costs):
         })
     
     # Recommandations pour le stockage
-    if costs["storage"]["estimated_monthly"] > 50:
+    if costs["storage"]["estimated_monthly"] > 0:
         recommendations.append({
             "category": "storage",
             "title": "Optimisation du stockage",
@@ -853,7 +888,7 @@ def generate_cost_recommendations(costs):
         })
     
     # Recommandations pour le réseau
-    if costs["network"]["estimated_monthly"] > 30:
+    if costs["network"]["estimated_monthly"] > 0:
         recommendations.append({
             "category": "network",
             "title": "Optimisation du réseau",
@@ -862,7 +897,7 @@ def generate_cost_recommendations(costs):
         })
     
     # Recommandations pour la base de données
-    if costs["database"]["estimated_monthly"] > 50:
+    if costs["database"]["estimated_monthly"] > 0:
         recommendations.append({
             "category": "database",
             "title": "Optimisation de la base de données",

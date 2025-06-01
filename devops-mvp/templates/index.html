@@ -142,6 +142,61 @@
                 <h2 class="text-xl font-semibold mb-4">Pipeline CI/CD suggéré</h2>
                 <pre id="pipeline" class="bg-gray-50 p-4 rounded-lg overflow-x-auto"></pre>
             </div>
+
+            <!-- Analyse des coûts cloud -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Analyse des coûts cloud</h2>
+                
+                <!-- Résumé des coûts -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Calcul</h3>
+                        <p id="computeCost" class="text-2xl font-bold text-indigo-600"></p>
+                        <p class="text-sm text-gray-600">par mois</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Stockage</h3>
+                        <p id="storageCost" class="text-2xl font-bold text-green-600"></p>
+                        <p class="text-sm text-gray-600">par mois</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Réseau</h3>
+                        <p id="networkCost" class="text-2xl font-bold text-blue-600"></p>
+                        <p class="text-sm text-gray-600">par mois</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Base de données</h3>
+                        <p id="databaseCost" class="text-2xl font-bold text-purple-600"></p>
+                        <p class="text-sm text-gray-600">par mois</p>
+                    </div>
+                </div>
+
+                <!-- Détails des coûts -->
+                <div class="space-y-4 mb-6">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium mb-2">Détails du calcul</h3>
+                        <ul id="computeDetails" class="text-sm text-gray-600"></ul>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium mb-2">Détails du stockage</h3>
+                        <ul id="storageDetails" class="text-sm text-gray-600"></ul>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium mb-2">Détails du réseau</h3>
+                        <ul id="networkDetails" class="text-sm text-gray-600"></ul>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium mb-2">Détails de la base de données</h3>
+                        <ul id="databaseDetails" class="text-sm text-gray-600"></ul>
+                    </div>
+                </div>
+
+                <!-- Recommandations d'optimisation -->
+                <div>
+                    <h3 class="font-medium mb-4">Recommandations d'optimisation</h3>
+                    <div id="costRecommendations" class="space-y-4"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -192,6 +247,43 @@
                     // Afficher le pipeline
                     document.getElementById('pipeline').textContent = 
                         JSON.stringify(data.analysis.suggested_pipeline, null, 2);
+
+                    // Afficher les coûts cloud
+                    const cloudCosts = data.analysis.cloud_costs;
+                    
+                    // Afficher les coûts estimés
+                    document.getElementById('computeCost').textContent = `$${cloudCosts.compute.estimated_monthly.toFixed(2)}`;
+                    document.getElementById('storageCost').textContent = `$${cloudCosts.storage.estimated_monthly.toFixed(2)}`;
+                    document.getElementById('networkCost').textContent = `$${cloudCosts.network.estimated_monthly.toFixed(2)}`;
+                    document.getElementById('databaseCost').textContent = `$${cloudCosts.database.estimated_monthly.toFixed(2)}`;
+                    
+                    // Afficher les détails
+                    document.getElementById('computeDetails').innerHTML = cloudCosts.compute.details
+                        .map(detail => `<li>• ${detail}</li>`)
+                        .join('');
+                    document.getElementById('storageDetails').innerHTML = cloudCosts.storage.details
+                        .map(detail => `<li>• ${detail}</li>`)
+                        .join('');
+                    document.getElementById('networkDetails').innerHTML = cloudCosts.network.details
+                        .map(detail => `<li>• ${detail}</li>`)
+                        .join('');
+                    document.getElementById('databaseDetails').innerHTML = cloudCosts.database.details
+                        .map(detail => `<li>• ${detail}</li>`)
+                        .join('');
+                    
+                    // Afficher les recommandations
+                    const recommendationsContainer = document.getElementById('costRecommendations');
+                    recommendationsContainer.innerHTML = cloudCosts.recommendations
+                        .map(rec => `
+                            <div class="p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="font-medium text-${getCategoryColor(rec.category)}">${rec.title}</h4>
+                                    <span class="text-sm font-medium text-green-600">Économies potentielles: ${rec.potential_savings}</span>
+                                </div>
+                                <p class="text-sm text-gray-600">${rec.description}</p>
+                            </div>
+                        `)
+                        .join('');
                 } else {
                     alert('Erreur: ' + data.message);
                 }
@@ -256,6 +348,16 @@
                     }
                 }
             });
+        }
+
+        function getCategoryColor(category) {
+            const colors = {
+                compute: 'indigo-600',
+                storage: 'green-600',
+                network: 'blue-600',
+                database: 'purple-600'
+            };
+            return colors[category] || 'gray-600';
         }
     </script>
 </body>

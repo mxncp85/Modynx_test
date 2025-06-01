@@ -140,7 +140,8 @@ async def analyze_repository(repo_url: str = Form(...)):
             "framework": detect_framework(local_path),
             "dependencies": detect_dependencies(local_path),
             "suggested_pipeline": generate_pipeline_config(local_path),
-            "health_score": calculate_health_score(local_path)
+            "health_score": calculate_health_score(local_path),
+            "cloud_costs": analyze_cloud_costs(local_path)
         }
         
         print(f"Analyse terminée: {analysis}")
@@ -705,6 +706,171 @@ def check_deps_details(path):
             pass
     
     return details
+
+def analyze_cloud_costs(path):
+    print(f"\nAnalyse des coûts cloud pour {path}")
+    costs = {
+        "compute": analyze_compute_costs(path),
+        "storage": analyze_storage_costs(path),
+        "network": analyze_network_costs(path),
+        "database": analyze_database_costs(path),
+        "recommendations": []
+    }
+    
+    # Générer des recommandations basées sur l'analyse
+    costs["recommendations"] = generate_cost_recommendations(costs)
+    
+    return costs
+
+def analyze_compute_costs(path):
+    costs = {
+        "estimated_monthly": 0,
+        "details": [],
+        "optimization_potential": 0
+    }
+    
+    # Analyser les fichiers de configuration pour détecter les ressources de calcul
+    if os.path.exists(os.path.join(path, "Dockerfile")):
+        try:
+            with open(os.path.join(path, "Dockerfile"), 'r') as f:
+                content = f.read().lower()
+                # Détecter les ressources CPU/RAM
+                if "cpu" in content or "memory" in content:
+                    costs["details"].append("Configuration Docker détectée")
+                    costs["estimated_monthly"] += 50  # Estimation de base
+        except Exception as e:
+            print(f"Erreur lors de la lecture du Dockerfile: {str(e)}")
+    
+    # Vérifier les fichiers de configuration cloud
+    cloud_configs = {
+        "aws": ["serverless.yml", "template.yaml"],
+        "azure": ["azure-pipelines.yml", "host.json"],
+        "gcp": ["app.yaml", "cloudbuild.yaml"]
+    }
+    
+    for provider, configs in cloud_configs.items():
+        for config in configs:
+            if os.path.exists(os.path.join(path, config)):
+                costs["details"].append(f"Configuration {provider} détectée")
+                costs["estimated_monthly"] += 100  # Estimation de base
+    
+    return costs
+
+def analyze_storage_costs(path):
+    costs = {
+        "estimated_monthly": 0,
+        "details": [],
+        "optimization_potential": 0
+    }
+    
+    # Analyser la taille du projet
+    total_size = 0
+    for root, _, files in os.walk(path):
+        if '.git' in root:
+            continue
+        for file in files:
+            try:
+                total_size += os.path.getsize(os.path.join(root, file))
+            except:
+                pass
+    
+    # Convertir en GB et estimer les coûts
+    size_gb = total_size / (1024 * 1024 * 1024)
+    costs["estimated_monthly"] = size_gb * 0.023  # Coût moyen par GB
+    costs["details"].append(f"Taille du projet: {size_gb:.2f} GB")
+    
+    return costs
+
+def analyze_network_costs(path):
+    costs = {
+        "estimated_monthly": 0,
+        "details": [],
+        "optimization_potential": 0
+    }
+    
+    # Vérifier les configurations réseau
+    if os.path.exists(os.path.join(path, "nginx.conf")):
+        costs["details"].append("Configuration Nginx détectée")
+        costs["estimated_monthly"] += 20
+    
+    # Vérifier les fichiers de configuration cloud pour les règles de réseau
+    cloud_configs = {
+        "aws": ["security-group.json", "vpc-config.json"],
+        "azure": ["network-config.json"],
+        "gcp": ["network-config.yaml"]
+    }
+    
+    for provider, configs in cloud_configs.items():
+        for config in configs:
+            if os.path.exists(os.path.join(path, config)):
+                costs["details"].append(f"Configuration réseau {provider} détectée")
+                costs["estimated_monthly"] += 30
+    
+    return costs
+
+def analyze_database_costs(path):
+    costs = {
+        "estimated_monthly": 0,
+        "details": [],
+        "optimization_potential": 0
+    }
+    
+    # Vérifier les configurations de base de données
+    db_configs = {
+        "postgresql": ["postgresql.conf", "pg_hba.conf"],
+        "mysql": ["my.cnf", "my.ini"],
+        "mongodb": ["mongod.conf"],
+        "redis": ["redis.conf"]
+    }
+    
+    for db, configs in db_configs.items():
+        for config in configs:
+            if os.path.exists(os.path.join(path, config)):
+                costs["details"].append(f"Configuration {db} détectée")
+                costs["estimated_monthly"] += 50
+    
+    return costs
+
+def generate_cost_recommendations(costs):
+    recommendations = []
+    
+    # Recommandations pour le calcul
+    if costs["compute"]["estimated_monthly"] > 100:
+        recommendations.append({
+            "category": "compute",
+            "title": "Optimisation des ressources de calcul",
+            "description": "Envisagez d'utiliser des instances spot ou de réduire la taille des instances pendant les périodes de faible charge.",
+            "potential_savings": "20-40%"
+        })
+    
+    # Recommandations pour le stockage
+    if costs["storage"]["estimated_monthly"] > 50:
+        recommendations.append({
+            "category": "storage",
+            "title": "Optimisation du stockage",
+            "description": "Utilisez le stockage à froid pour les données rarement accédées et mettez en place une politique de rétention.",
+            "potential_savings": "30-50%"
+        })
+    
+    # Recommandations pour le réseau
+    if costs["network"]["estimated_monthly"] > 30:
+        recommendations.append({
+            "category": "network",
+            "title": "Optimisation du réseau",
+            "description": "Mettez en place un CDN et optimisez les règles de pare-feu pour réduire les coûts de transfert de données.",
+            "potential_savings": "15-25%"
+        })
+    
+    # Recommandations pour la base de données
+    if costs["database"]["estimated_monthly"] > 50:
+        recommendations.append({
+            "category": "database",
+            "title": "Optimisation de la base de données",
+            "description": "Envisagez d'utiliser des instances réservées et optimisez les requêtes pour réduire la consommation de ressources.",
+            "potential_savings": "25-35%"
+        })
+    
+    return recommendations
 
 if __name__ == "__main__":
     import uvicorn

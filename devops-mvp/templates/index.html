@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps-as-a-Service MVP</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">DevOps-as-a-Service</h1>
+            <p class="text-xl text-gray-600">Configuration automatique de CI/CD pour votre projet</p>
+        </header>
+
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <form id="repoForm" class="space-y-6">
+                <div>
+                    <label for="repoUrl" class="block text-sm font-medium text-gray-700">URL du Repository Git</label>
+                    <input type="text" id="repoUrl" name="repoUrl" required
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                           placeholder="https://github.com/username/repo.git">
+                </div>
+                <button type="submit"
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Analyser le Repository
+                </button>
+            </form>
+
+            <div id="results" class="mt-8 hidden">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Résultats de l'analyse</h2>
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-4 rounded-md">
+                        <h3 class="font-medium text-gray-700">Langage détecté</h3>
+                        <p id="language" class="text-gray-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-md">
+                        <h3 class="font-medium text-gray-700">Framework détecté</h3>
+                        <p id="framework" class="text-gray-600"></p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-md">
+                        <h3 class="font-medium text-gray-700">Dépendances</h3>
+                        <ul id="dependencies" class="text-gray-600 list-disc list-inside"></ul>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-md">
+                        <h3 class="font-medium text-gray-700">Configuration CI/CD suggérée</h3>
+                        <pre id="pipeline" class="bg-gray-800 text-white p-4 rounded-md overflow-x-auto"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('repoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const repoUrl = document.getElementById('repoUrl').value;
+            
+            try {
+                const response = await fetch('/analyze-repo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `repo_url=${encodeURIComponent(repoUrl)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    document.getElementById('results').classList.remove('hidden');
+                    document.getElementById('language').textContent = data.analysis.language;
+                    document.getElementById('framework').textContent = data.analysis.framework;
+                    
+                    const dependenciesList = document.getElementById('dependencies');
+                    dependenciesList.innerHTML = data.analysis.dependencies
+                        .map(dep => `<li>${dep}</li>`)
+                        .join('');
+                    
+                    document.getElementById('pipeline').textContent = 
+                        JSON.stringify(data.analysis.suggested_pipeline, null, 2);
+                } else {
+                    alert('Erreur: ' + data.message);
+                }
+            } catch (error) {
+                alert('Erreur lors de l\'analyse du repository');
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html> 

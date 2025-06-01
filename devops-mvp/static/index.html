@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CI/CD Auto Setup</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 50px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+    }
+    .status {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>CI/CD Auto-Setup</h1>
+  <input type="text" id="repo" placeholder="URL du dépôt GitHub">
+  <button onclick="submitRepo()">Configurer CI/CD</button>
+  <div class="status" id="status"></div>
+
+  <script>
+    async function submitRepo() {
+      const repo = document.getElementById('repo').value;
+      const status = document.getElementById('status');
+      status.textContent = 'Traitement en cours...';
+      try {
+        const res = await fetch('/setup-ci', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({repo_url: repo})
+        });
+        const data = await res.json();
+        status.textContent = data.message || data.detail;
+      } catch (err) {
+        status.textContent = 'Erreur : ' + err;
+      }
+    }
+  </script>
+</body>
+</html>

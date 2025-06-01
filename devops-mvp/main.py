@@ -208,7 +208,8 @@ def detect_language(path):
 
 def detect_framework(path):
     print(f"\nDétection du framework dans {path}")
-    # Logique améliorée de détection de framework
+    
+    # Détection basée sur les fichiers de configuration
     if os.path.exists(os.path.join(path, "requirements.txt")):
         print("Analyse du fichier requirements.txt")
         with open(os.path.join(path, "requirements.txt")) as f:
@@ -224,70 +225,98 @@ def detect_framework(path):
             elif "tornado" in content:
                 return "Tornado"
     
-    if os.path.exists(os.path.join(path, "package.json")):
-        print("Analyse du fichier package.json")
-        with open(os.path.join(path, "package.json")) as f:
-            content = f.read().lower()
-            if "react" in content:
-                return "React"
-            elif "vue" in content:
-                return "Vue.js"
-            elif "angular" in content:
-                return "Angular"
-            elif "next" in content:
-                return "Next.js"
-            elif "express" in content:
-                return "Express.js"
+    # Détection basée sur la structure des fichiers
+    for root, _, files in os.walk(path):
+        if '.git' in root:
+            continue
+            
+        # Détection FastAPI
+        if any(f.endswith('.py') for f in files):
+            for file in files:
+                if file.endswith('.py'):
+                    try:
+                        with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                            content = f.read().lower()
+                            if 'fastapi' in content and 'app = fastapi' in content:
+                                return "FastAPI"
+                            elif 'flask' in content and 'app = flask' in content:
+                                return "Flask"
+                            elif 'django' in content and 'django.setup()' in content:
+                                return "Django"
+                    except Exception as e:
+                        print(f"Erreur lors de la lecture du fichier {file}: {str(e)}")
     
-    if os.path.exists(os.path.join(path, "pom.xml")):
-        print("Analyse du fichier pom.xml")
-        with open(os.path.join(path, "pom.xml")) as f:
-            content = f.read().lower()
-            if "spring-boot" in content:
-                return "Spring Boot"
-            elif "quarkus" in content:
-                return "Quarkus"
-    
-    # Vérification des dossiers spécifiques aux frameworks
-    if os.path.exists(os.path.join(path, "src", "main", "java")):
-        return "Spring Boot"
-    elif os.path.exists(os.path.join(path, "src", "app")):
-        return "Angular"
-    elif os.path.exists(os.path.join(path, "src", "components")):
-        return "React"
+    # Détection basée sur la structure des dossiers
+    if os.path.exists(os.path.join(path, "manage.py")):
+        return "Django"
+    elif os.path.exists(os.path.join(path, "app.py")) or os.path.exists(os.path.join(path, "main.py")):
+        # Vérifier le contenu pour déterminer le framework
+        try:
+            with open(os.path.join(path, "main.py"), 'r', encoding='utf-8') as f:
+                content = f.read().lower()
+                if 'fastapi' in content:
+                    return "FastAPI"
+                elif 'flask' in content:
+                    return "Flask"
+        except:
+            pass
     
     print("Aucun framework détecté")
     return "Unknown"
 
 def detect_dependencies(path):
+    print(f"\nDétection des dépendances dans {path}")
     dependencies = []
     
     # Python dependencies
     if os.path.exists(os.path.join(path, "requirements.txt")):
+        print("Analyse du fichier requirements.txt")
         with open(os.path.join(path, "requirements.txt")) as f:
-            dependencies.extend([line.strip() for line in f if line.strip() and not line.startswith("#")])
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # Extraire le nom et la version
+                    if '==' in line:
+                        name, version = line.split('==')
+                        dependencies.append(f"{name}=={version}")
+                    elif '>=' in line:
+                        name, version = line.split('>=')
+                        dependencies.append(f"{name}>={version}")
+                    elif '<=' in line:
+                        name, version = line.split('<=')
+                        dependencies.append(f"{name}<={version}")
+                    else:
+                        dependencies.append(line)
     
     # Node.js dependencies
     if os.path.exists(os.path.join(path, "package.json")):
-        with open(os.path.join(path, "package.json")) as f:
-            try:
+        print("Analyse du fichier package.json")
+        try:
+            with open(os.path.join(path, "package.json")) as f:
                 package_data = json.load(f)
                 if "dependencies" in package_data:
-                    dependencies.extend([f"{pkg}@{ver}" for pkg, ver in package_data["dependencies"].items()])
+                    for pkg, ver in package_data["dependencies"].items():
+                        dependencies.append(f"{pkg}@{ver}")
                 if "devDependencies" in package_data:
-                    dependencies.extend([f"{pkg}@{ver} (dev)" for pkg, ver in package_data["devDependencies"].items()])
-            except json.JSONDecodeError:
-                pass
+                    for pkg, ver in package_data["devDependencies"].items():
+                        dependencies.append(f"{pkg}@{ver} (dev)")
+        except json.JSONDecodeError as e:
+            print(f"Erreur lors de la lecture de package.json: {str(e)}")
     
     # Java dependencies
     if os.path.exists(os.path.join(path, "pom.xml")):
-        with open(os.path.join(path, "pom.xml")) as f:
-            content = f.read()
-            # Simple regex pour extraire les dépendances Maven
-            import re
-            deps = re.findall(r'<dependency>.*?<artifactId>(.*?)</artifactId>.*?<version>(.*?)</version>.*?</dependency>', content, re.DOTALL)
-            dependencies.extend([f"{dep[0]}@{dep[1]}" for dep in deps])
+        print("Analyse du fichier pom.xml")
+        try:
+            with open(os.path.join(path, "pom.xml")) as f:
+                content = f.read()
+                # Simple regex pour extraire les dépendances Maven
+                import re
+                deps = re.findall(r'<dependency>.*?<artifactId>(.*?)</artifactId>.*?<version>(.*?)</version>.*?</dependency>', content, re.DOTALL)
+                dependencies.extend([f"{dep[0]}@{dep[1]}" for dep in deps])
+        except Exception as e:
+            print(f"Erreur lors de la lecture de pom.xml: {str(e)}")
     
+    print(f"Dépendances trouvées: {dependencies}")
     return dependencies
 
 def generate_pipeline_config(path):

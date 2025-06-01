@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from fastapi.templating import Jinja2Templates
 import time
+import re
 
 app = FastAPI(title="DevOps-as-a-Service MVP")
 
@@ -140,6 +141,7 @@ async def analyze_repository(repo_url: str = Form(...)):
             "language": detect_language(local_path),
             "framework": detect_framework(local_path),
             "dependencies": detect_dependencies(local_path),
+            "port": detect_port(local_path),
             "suggested_pipeline": generate_pipeline_config(local_path),
             "health_score": calculate_health_score(local_path),
             "cloud_costs": analyze_cloud_costs(local_path)
@@ -280,22 +282,25 @@ def detect_dependencies(path):
     # Python dependencies
     if os.path.exists(os.path.join(path, "requirements.txt")):
         print("Analyse du fichier requirements.txt")
-        with open(os.path.join(path, "requirements.txt")) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    # Extraire le nom et la version
-                    if '==' in line:
-                        name, version = line.split('==')
-                        dependencies.append(f"{name}=={version}")
-                    elif '>=' in line:
-                        name, version = line.split('>=')
-                        dependencies.append(f"{name}>={version}")
-                    elif '<=' in line:
-                        name, version = line.split('<=')
-                        dependencies.append(f"{name}<={version}")
-                    else:
-                        dependencies.append(line)
+        try:
+            with open(os.path.join(path, "requirements.txt")) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        # Extraire le nom et la version
+                        if '==' in line:
+                            name, version = line.split('==')
+                            dependencies.append(f"{name}=={version}")
+                        elif '>=' in line:
+                            name, version = line.split('>=')
+                            dependencies.append(f"{name}>={version}")
+                        elif '<=' in line:
+                            name, version = line.split('<=')
+                            dependencies.append(f"{name}<={version}")
+                        else:
+                            dependencies.append(line)
+        except Exception as e:
+            print(f"Erreur lors de la lecture de requirements.txt: {str(e)}")
     
     # Node.js dependencies
     if os.path.exists(os.path.join(path, "package.json")):
@@ -325,8 +330,112 @@ def detect_dependencies(path):
         except Exception as e:
             print(f"Erreur lors de la lecture de pom.xml: {str(e)}")
     
+    # Détection des dépendances dans le code Python
+    for root, _, files in os.walk(path):
+        if '.git' in root or 'venv' in root or '__pycache__' in root:
+            continue
+        for file in files:
+            if file.endswith('.py'):
+                try:
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Détecter les imports
+                        import_lines = re.findall(r'^(?:from|import)\s+([\w\.]+)', content, re.MULTILINE)
+                        for imp in import_lines:
+                            if imp not in ['os', 'sys', 're', 'json', 'datetime', 'time']:  # Ignorer les imports standards
+                                dependencies.append(f"{imp} (importé dans {file})")
+                except Exception as e:
+                    print(f"Erreur lors de la lecture du fichier {file}: {str(e)}")
+    
     print(f"Dépendances trouvées: {dependencies}")
     return dependencies
+
+def detect_port(path):
+    print(f"\nDétection du port dans {path}")
+    port = None
+    
+    # Chercher dans les fichiers Python
+    for root, _, files in os.walk(path):
+        if '.git' in root or 'venv' in root or '__pycache__' in root:
+            continue
+        for file in files:
+            if file.endswith('.py'):
+                try:
+                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Chercher les patterns courants de définition de port
+                        port_patterns = [
+                            r'port\s*=\s*(\d+)',
+                            r'PORT\s*=\s*(\d+)',
+                            r'port\s*:\s*(\d+)',
+                            r'PORT\s*:\s*(\d+)',
+                            r'listen\(.*?,\s*(\d+)\)',
+                            r'bind\(.*?,\s*(\d+)\)',
+                            r'run\(.*?port\s*=\s*(\d+)',
+                            r'uvicorn\.run\(.*?port\s*=\s*(\d+)',
+                            r'flask\.run\(.*?port\s*=\s*(\d+)',
+                            r'django\.runserver\(.*?port\s*=\s*(\d+)'
+                        ]
+                        for pattern in port_patterns:
+                            matches = re.findall(pattern, content)
+                            if matches:
+                                port = int(matches[0])
+                                print(f"Port trouvé dans {file}: {port}")
+                                return port
+                except Exception as e:
+                    print(f"Erreur lors de la lecture du fichier {file}: {str(e)}")
+    
+    # Chercher dans les fichiers de configuration
+    config_files = [
+        'config.py', 'settings.py', '.env', 'docker-compose.yml', 'docker-compose.yaml',
+        'dockerfile', 'Dockerfile', 'nginx.conf', 'apache.conf'
+    ]
+    
+    for config_file in config_files:
+        config_path = os.path.join(path, config_file)
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    # Chercher les patterns de port dans les fichiers de configuration
+                    port_patterns = [
+                        r'PORT\s*=\s*(\d+)',
+                        r'port\s*=\s*(\d+)',
+                        r'port:\s*(\d+)',
+                        r'expose\s*(\d+)',
+                        r'EXPOSE\s*(\d+)',
+                        r'listen\s*(\d+)',
+                        r'LISTEN\s*(\d+)'
+                    ]
+                    for pattern in port_patterns:
+                        matches = re.findall(pattern, content)
+                        if matches:
+                            port = int(matches[0])
+                            print(f"Port trouvé dans {config_file}: {port}")
+                            return port
+            except Exception as e:
+                print(f"Erreur lors de la lecture de {config_file}: {str(e)}")
+    
+    # Port par défaut selon le framework détecté
+    framework = detect_framework(path)
+    default_ports = {
+        'FastAPI': 8000,
+        'Flask': 5000,
+        'Django': 8000,
+        'Node.js': 3000,
+        'React': 3000,
+        'Vue.js': 8080,
+        'Angular': 4200
+    }
+    
+    if framework in default_ports:
+        port = default_ports[framework]
+        print(f"Port par défaut pour {framework}: {port}")
+    else:
+        port = 8000  # Port par défaut générique
+        print(f"Port par défaut générique: {port}")
+    
+    return port
 
 def generate_pipeline_config(path):
     language = detect_language(path)

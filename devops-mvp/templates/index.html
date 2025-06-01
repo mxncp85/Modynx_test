@@ -19,11 +19,33 @@
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                            placeholder="https://github.com/username/repo.git">
                 </div>
-                <button type="submit"
+                <button type="submit" id="analyzeButton"
                         class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Analyser
+                    <span id="buttonText">Analyser</span>
+                    <div id="loadingSpinner" class="hidden ml-2">
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
                 </button>
             </form>
+        </div>
+
+        <!-- Overlay de chargement -->
+        <div id="loadingOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+                <div class="flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Analyse en cours</h3>
+                    <p class="text-sm text-gray-600 text-center">
+                        Nous analysons votre repository. Cela peut prendre quelques instants...
+                    </p>
+                    <div class="mt-4 w-full bg-gray-200 rounded-full h-2">
+                        <div id="progressBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="results" class="mt-8 space-y-6 hidden">
@@ -205,6 +227,29 @@
             e.preventDefault();
             const repoUrl = document.getElementById('repoUrl').value;
             
+            // Afficher l'animation de chargement
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const analyzeButton = document.getElementById('analyzeButton');
+            const buttonText = document.getElementById('buttonText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const progressBar = document.getElementById('progressBar');
+            
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+            analyzeButton.disabled = true;
+            buttonText.textContent = 'Analyse en cours...';
+            loadingSpinner.classList.remove('hidden');
+            
+            // Simuler une progression
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) {
+                    clearInterval(progressInterval);
+                }
+                progressBar.style.width = `${Math.min(progress, 90)}%`;
+            }, 500);
+            
             try {
                 const response = await fetch('/analyze-repo', {
                     method: 'POST',
@@ -215,6 +260,12 @@
                 });
                 
                 const data = await response.json();
+                
+                // Compléter la barre de progression
+                progressBar.style.width = '100%';
+                
+                // Attendre un court instant pour montrer la progression complète
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 if (data.status === 'success') {
                     document.getElementById('results').classList.remove('hidden');
@@ -289,6 +340,15 @@
                 }
             } catch (error) {
                 alert('Erreur lors de l\'analyse: ' + error);
+            } finally {
+                // Réinitialiser l'interface
+                loadingOverlay.classList.add('hidden');
+                loadingOverlay.classList.remove('flex');
+                analyzeButton.disabled = false;
+                buttonText.textContent = 'Analyser';
+                loadingSpinner.classList.add('hidden');
+                progressBar.style.width = '0%';
+                clearInterval(progressInterval);
             }
         });
 

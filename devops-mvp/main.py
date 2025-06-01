@@ -486,43 +486,101 @@ def calculate_health_score(path):
     }
 
 def check_tests(path):
+    print(f"\nVérification des tests dans {path}")
     score = 0
-    # Vérifier la présence de tests
+    test_files = []
+    ignored_dirs = ['venv', '.git', '__pycache__', 'site-packages']
+    
+    # Vérifier la présence de dossiers de test
     if os.path.exists(os.path.join(path, "tests")):
         score += 10
+        print("Dossier tests/ trouvé")
     if os.path.exists(os.path.join(path, "test")):
         score += 10
+        print("Dossier test/ trouvé")
     
-    # Vérifier la présence de fichiers de test
-    test_files = []
-    for root, _, files in os.walk(path):
-        if '.git' in root:
-            continue
+    # Parcourir les fichiers en ignorant les dossiers spécifiés
+    for root, dirs, files in os.walk(path):
+        # Ignorer les dossiers spécifiés
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        
         for file in files:
-            if file.startswith('test_') or file.endswith('_test.py'):
-                test_files.append(os.path.join(root, file))
+            if file.endswith('.py'):
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, path)
+                
+                # Vérifier si c'est un fichier de test
+                is_test_file = (
+                    file.startswith('test_') or 
+                    file.endswith('_test.py') or 
+                    'tests/' in relative_path or 
+                    'test/' in relative_path
+                )
+                
+                if is_test_file:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            # Vérifier si le fichier contient des fonctions de test
+                            if 'def test_' in content:
+                                test_files.append(relative_path)
+                                print(f"Fichier de test trouvé: {relative_path}")
+                    except Exception as e:
+                        print(f"Erreur lors de la lecture du fichier {file_path}: {str(e)}")
     
+    # Calculer le score basé sur le nombre de fichiers de test
     if test_files:
-        score += 10
+        score += min(len(test_files) * 2, 10)  # Maximum 10 points pour les fichiers de test
+        print(f"Nombre de fichiers de test trouvés: {len(test_files)}")
     
     return min(score, 20)
 
 def check_test_details(path):
+    print(f"\nDétails des tests dans {path}")
     details = []
     test_files = []
+    ignored_dirs = ['venv', '.git', '__pycache__', 'site-packages']
     
-    for root, _, files in os.walk(path):
-        if '.git' in root:
-            continue
+    # Vérifier les dossiers de test
+    if os.path.exists(os.path.join(path, "tests")):
+        details.append("Dossier tests/ présent")
+    if os.path.exists(os.path.join(path, "test")):
+        details.append("Dossier test/ présent")
+    
+    # Parcourir les fichiers en ignorant les dossiers spécifiés
+    for root, dirs, files in os.walk(path):
+        # Ignorer les dossiers spécifiés
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        
         for file in files:
-            if file.startswith('test_') or file.endswith('_test.py'):
-                test_files.append(os.path.join(root, file))
+            if file.endswith('.py'):
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, path)
+                
+                # Vérifier si c'est un fichier de test
+                is_test_file = (
+                    file.startswith('test_') or 
+                    file.endswith('_test.py') or 
+                    'tests/' in relative_path or 
+                    'test/' in relative_path
+                )
+                
+                if is_test_file:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            # Vérifier si le fichier contient des fonctions de test
+                            if 'def test_' in content:
+                                test_files.append(relative_path)
+                                details.append(f"Fichier de test trouvé: {relative_path}")
+                                # Compter le nombre de fonctions de test
+                                test_functions = content.count('def test_')
+                                if test_functions > 0:
+                                    details.append(f"  - Contient {test_functions} fonction(s) de test")
+                    except Exception as e:
+                        print(f"Erreur lors de la lecture du fichier {file_path}: {str(e)}")
     
-    if test_files:
-        details.append(f"Fichiers de test trouvés: {len(test_files)}")
-        for file in test_files:
-            details.append(f"- {file}")
-    else:
+    if not test_files:
         details.append("Aucun fichier de test trouvé")
     
     return details

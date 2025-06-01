@@ -95,11 +95,12 @@ async def home(request: Request):
 
 @app.post("/analyze-repo")
 async def analyze_repository(repo_url: str = Form(...)):
+    temp_dir = None
     try:
-        # Cloner le repository
+        # Créer un dossier temporaire unique
+        temp_dir = tempfile.mkdtemp(prefix="repo_analysis_")
         repo_name = repo_url.split("/")[-1].replace(".git", "")
-        local_path = f"temp/{repo_name}"
-        os.makedirs("temp", exist_ok=True)
+        local_path = os.path.join(temp_dir, repo_name)
         
         print(f"Clonage du repository {repo_url} vers {local_path}")
         
@@ -144,13 +145,18 @@ async def analyze_repository(repo_url: str = Form(...)):
         
         print(f"Analyse terminée: {analysis}")
         
-        # Nettoyage
-        shutil.rmtree(local_path)
-        
         return {"status": "success", "analysis": analysis}
     except Exception as e:
         print(f"Erreur lors de l'analyse: {str(e)}")
         return {"status": "error", "message": str(e)}
+    finally:
+        # Nettoyage du dossier temporaire
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+                print(f"Dossier temporaire {temp_dir} supprimé avec succès")
+            except Exception as e:
+                print(f"Erreur lors de la suppression du dossier temporaire: {str(e)}")
 
 def detect_language(path):
     print(f"\nDétection du langage dans {path}")
